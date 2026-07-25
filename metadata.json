@@ -1,0 +1,6 @@
+{
+  "name": "Facial Emotion Recognition System",
+  "description": "Real-time facial emotion recognition platform featuring live webcam detection (on-device TensorFlow.js inference, no server), mood analytics, an interactive CNN explainer, dataset benchmarks, and mental health monitoring. Fully static deployment (Section 8.1 of the project blueprint).",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
