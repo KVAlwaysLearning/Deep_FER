@@ -108,7 +108,13 @@ def _load_and_preprocess_image(filepath, label, img_size, channels):
     image = tf.io.read_file(filepath)
     image = tf.image.decode_jpeg(image, channels=channels)
     image = tf.image.resize(image, img_size)
-    image = tf.cast(image, tf.float32) / 255.0
+    # NOTE: intentionally NOT dividing by 255 here. Each model handles its
+    # own input scaling below (Rescaling for the Custom CNN,
+    # mobilenet_v2.preprocess_input for the transfer model, which itself
+    # expects raw [0,255] input and does its own [-1,1] scaling — applying
+    # both here AND there was a bug that crushed nearly all image signal
+    # and caused MobileNetV2 training to collapse to a single class).
+    image = tf.cast(image, tf.float32)
     label = tf.one_hot(label, NUM_CLASSES)
     return image, label
 
@@ -145,7 +151,8 @@ def build_custom_cnn(input_shape=(48, 48, 1), num_classes=7):
     """
     inputs = keras.Input(shape=input_shape)
 
-    x = layers.RandomFlip("horizontal")(inputs)
+    x = layers.Rescaling(1.0 / 255)(inputs)
+    x = layers.RandomFlip("horizontal")(x)
     x = layers.RandomRotation(0.1)(x)
     x = layers.RandomZoom(0.1)(x)
     x = layers.RandomTranslation(0.1, 0.1)(x)
