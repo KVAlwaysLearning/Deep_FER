@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { DATASET_STATS } from "../data/datasetData";
 import { loadBenchmarkResults, BenchmarkResultBundle } from "../utils/benchmarkResults";
+import { loadOnDeviceModels, getMLModelStatus } from "../utils/emotionDetector";
 
 export const DatasetBenchmarks: React.FC = () => {
   const [activeModelCurve, setActiveModelCurve] = useState<"both" | "cnn" | "tl">("both");
@@ -30,7 +31,14 @@ export const DatasetBenchmarks: React.FC = () => {
   const [bundle, setBundle] = useState<BenchmarkResultBundle | null>(null);
 
   useEffect(() => {
-    loadBenchmarkResults().then(setBundle);
+    loadOnDeviceModels().then(() => {
+      const { deployedArchitecture } = getMLModelStatus();
+      loadBenchmarkResults(deployedArchitecture).then((b) => {
+        setBundle(b);
+        if (b.hasCnnResults && !b.hasTlResults) setActiveModelCurve("cnn");
+        else if (!b.hasCnnResults && b.hasTlResults) setActiveModelCurve("tl");
+      });
+    });
   }, []);
 
   if (!bundle) {
@@ -47,6 +55,8 @@ export const DatasetBenchmarks: React.FC = () => {
     confusionMatrixLabels: CONFUSION_MATRIX_LABELS,
     confusionMatrix: CONFUSION_MATRIX_DATA,
     comparisonTable: MODEL_COMPARISON_TABLE,
+    hasCnnResults,
+    hasTlResults,
   } = bundle;
 
   return (
@@ -175,7 +185,7 @@ export const DatasetBenchmarks: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {MODEL_COMPARISON_TABLE.map((row, idx) => {
-                const isWinner = row.status.includes("SELECTED WINNER");
+                const isWinner = row.status.includes("DEPLOYED");
                 return (
                 <tr key={idx} className={isWinner ? "bg-emerald-950/20 font-semibold" : "hover:bg-slate-800/40"}>
                   <td className="py-3 px-4 text-white font-bold">{row.architecture}</td>
@@ -214,21 +224,33 @@ export const DatasetBenchmarks: React.FC = () => {
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
             <button
               onClick={() => setActiveModelCurve("both")}
-              className={`px-2.5 py-1 rounded ${activeModelCurve === "both" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"}`}
+              disabled={!(hasCnnResults && hasTlResults)}
+              title={!(hasCnnResults && hasTlResults) ? "Train both architectures to compare" : undefined}
+              className={`px-2.5 py-1 rounded ${
+                activeModelCurve === "both" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"
+              } ${!(hasCnnResults && hasTlResults) ? "opacity-40 cursor-not-allowed" : ""}`}
             >
               Compare Both
             </button>
             <button
               onClick={() => setActiveModelCurve("tl")}
-              className={`px-2.5 py-1 rounded ${activeModelCurve === "tl" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"}`}
+              disabled={!hasTlResults}
+              title={!hasTlResults ? "MobileNetV2 not trained yet — see README for how to add results" : undefined}
+              className={`px-2.5 py-1 rounded ${
+                activeModelCurve === "tl" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"
+              } ${!hasTlResults ? "opacity-40 cursor-not-allowed" : ""}`}
             >
-              MobileNetV2
+              MobileNetV2 {!hasTlResults && "(not trained)"}
             </button>
             <button
               onClick={() => setActiveModelCurve("cnn")}
-              className={`px-2.5 py-1 rounded ${activeModelCurve === "cnn" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"}`}
+              disabled={!hasCnnResults}
+              title={!hasCnnResults ? "Custom CNN not trained yet" : undefined}
+              className={`px-2.5 py-1 rounded ${
+                activeModelCurve === "cnn" ? "bg-sky-500 text-white font-semibold" : "text-slate-400"
+              } ${!hasCnnResults ? "opacity-40 cursor-not-allowed" : ""}`}
             >
-              Custom CNN
+              Custom CNN {!hasCnnResults && "(not trained)"}
             </button>
           </div>
         </div>
@@ -241,14 +263,14 @@ export const DatasetBenchmarks: React.FC = () => {
               <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px", fontSize: "12px" }} />
               <Legend wrapperStyle={{ fontSize: "12px" }} />
 
-              {(activeModelCurve === "both" || activeModelCurve === "tl") && (
+              {hasTlResults && (activeModelCurve === "both" || activeModelCurve === "tl") && (
                 <>
                   <Line type="monotone" dataKey="tlValAcc" name="MobileNetV2 Val Acc (%)" stroke="#10b981" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="tlTrainAcc" name="MobileNetV2 Train Acc (%)" stroke="#34d399" strokeDasharray="3 3" dot={false} />
                 </>
               )}
 
-              {(activeModelCurve === "both" || activeModelCurve === "cnn") && (
+              {hasCnnResults && (activeModelCurve === "both" || activeModelCurve === "cnn") && (
                 <>
                   <Line type="monotone" dataKey="cnnValAcc" name="Custom CNN Val Acc (%)" stroke="#38bdf8" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="cnnTrainAcc" name="Custom CNN Train Acc (%)" stroke="#60a5fa" strokeDasharray="3 3" dot={false} />
@@ -258,6 +280,14 @@ export const DatasetBenchmarks: React.FC = () => {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {!hasTlResults && !bundle.isPlaceholder && (
+        <div className="text-[11px] text-slate-500 -mt-4 px-1">
+          MobileNetV2 hasn't been trained yet — only Custom CNN results are shown. Train it with{" "}
+          <code className="text-slate-400">python scripts/train_fer_pipeline.py --architecture mobilenetv2</code>{" "}
+          and add <code className="text-slate-400">public/results/mobilenetv2_results.json</code> to compare.
+        </div>
+      )}
 
       {/* 7x7 Confusion Matrix & Per-Class Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

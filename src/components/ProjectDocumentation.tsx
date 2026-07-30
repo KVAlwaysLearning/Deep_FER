@@ -48,9 +48,10 @@ export const ProjectDocumentation: React.FC = () => {
 
   useEffect(() => {
     loadOnDeviceModels().then(() => {
-      setUsingCustomModel(getMLModelStatus().usingCustomModel);
+      const status = getMLModelStatus();
+      setUsingCustomModel(status.usingCustomModel);
+      loadBenchmarkResults(status.deployedArchitecture).then(setBundle);
     });
-    loadBenchmarkResults().then(setBundle);
   }, []);
 
   const trainingDone = !!bundle && !bundle.isPlaceholder;
@@ -144,7 +145,7 @@ export const ProjectDocumentation: React.FC = () => {
           <ObjectiveCard
             number={6}
             title="System Integration and Optimization"
-            description={`Model selection rule (Section 2.3): whichever architecture scores higher weighted F1 is wired into the pipeline. Current winner: ${winnerLabel}.`}
+            description={`Model selection (Section 2.3): the architecture actually deployed to public/model/ is wired into the real-time pipeline — currently: ${winnerLabel}. This can be either the higher-weighted-F1 architecture or a manual choice.`}
             done={trainingDone}
             pendingNote="Selection can't be made until both architectures have real evaluation results — see Objective 3."
           />
