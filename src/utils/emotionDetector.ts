@@ -35,6 +35,7 @@ const CUSTOM_MODEL_ORDER: EmotionType[] = [
 
 let customModel: tf.LayersModel | null = null;
 let usingCustomModel = false;
+let deployedArchitecture: "custom_cnn" | "mobilenetv2" | null = null;
 
 // Temporal smoothing cache holding the last N frame predictions
 let frameHistory: EmotionScores[] = [];
@@ -56,6 +57,7 @@ export function getMLModelStatus(): {
   error: string | null;
   usingCustomModel: boolean;
   modelSource: string;
+  deployedArchitecture: "custom_cnn" | "mobilenetv2" | null;
 } {
   return {
     status: modelStatus,
@@ -65,6 +67,7 @@ export function getMLModelStatus(): {
     modelSource: usingCustomModel
       ? "Custom-trained model (public/model/)"
       : "face-api.js pretrained expression net (fallback)",
+    deployedArchitecture,
   };
 }
 
@@ -107,10 +110,21 @@ export async function loadOnDeviceModels(): Promise<boolean> {
     try {
       customModel = await tf.loadLayersModel("/model/model.json");
       usingCustomModel = true;
-      console.log("[ML Engine] Custom-trained model found and loaded from public/model/.");
+      // scripts/train_fer_pipeline.py names the Keras model
+      // "Custom_4Block_CNN" or "MobileNetV2_FER2013" — that name survives
+      // TF.js conversion, so we can tell which architecture is actually
+      // deployed rather than guessing from input shape alone.
+      const modelName = customModel.name || "";
+      if (modelName.toLowerCase().includes("mobilenet")) {
+        deployedArchitecture = "mobilenetv2";
+      } else {
+        deployedArchitecture = "custom_cnn";
+      }
+      console.log(`[ML Engine] Custom-trained model found and loaded from public/model/ (architecture: ${deployedArchitecture}).`);
     } catch {
       customModel = null;
       usingCustomModel = false;
+      deployedArchitecture = null;
       console.log(
         "[ML Engine] No custom-trained model at public/model/ yet — using face-api's " +
         "pretrained expression net. Run scripts/train_fer_pipeline.py and export to " +
