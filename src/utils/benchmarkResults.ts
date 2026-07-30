@@ -42,6 +42,8 @@ export interface BenchmarkResultBundle {
   confusionMatrixLabels: string[];
   comparisonTable: typeof PLACEHOLDER_COMPARISON_TABLE;
   winner: "custom_cnn" | "mobilenetv2" | null;
+  hasCnnResults: boolean;
+  hasTlResults: boolean;
 }
 
 const capitalize = (s: string): EmotionType =>
@@ -109,8 +111,15 @@ function buildEpochsData(cnn: RawTrainingResults | null, tl: RawTrainingResults 
 function buildComparisonTable(
   cnn: RawTrainingResults | null,
   tl: RawTrainingResults | null,
-  winner: "custom_cnn" | "mobilenetv2" | null
+  deployed: "custom_cnn" | "mobilenetv2" | null,
+  betterF1: "custom_cnn" | "mobilenetv2" | null
 ) {
+  const statusFor = (arch: "custom_cnn" | "mobilenetv2"): string => {
+    if (deployed === arch) return "DEPLOYED (Wired to Real-Time Pipeline)";
+    if (betterF1 === arch) return "Higher Weighted F1 (Not Deployed)";
+    return "Baseline Contender";
+  };
+
   const rows = [];
   if (cnn) {
     const f1 = cnn.classification_report["weighted avg"]["f1-score"];
@@ -124,7 +133,7 @@ function buildComparisonTable(
       top1Acc: `${(cnn.classification_report["accuracy"] * 100).toFixed(1)}%`,
       top2Acc: "—",
       weightedF1: f1.toFixed(3),
-      status: winner === "custom_cnn" ? "SELECTED WINNER (Wired to Real-Time Pipeline)" : "Baseline Contender",
+      status: statusFor("custom_cnn"),
     });
   }
   if (tl) {
@@ -139,7 +148,7 @@ function buildComparisonTable(
       top1Acc: `${(tl.classification_report["accuracy"] * 100).toFixed(1)}%`,
       top2Acc: "—",
       weightedF1: f1.toFixed(3),
-      status: winner === "mobilenetv2" ? "SELECTED WINNER (Wired to Real-Time Pipeline)" : "Baseline Contender",
+      status: statusFor("mobilenetv2"),
     });
   }
   return rows.length > 0 ? rows : PLACEHOLDER_COMPARISON_TABLE;
@@ -149,8 +158,21 @@ function buildComparisonTable(
  * Loads real benchmark results if available; otherwise returns the
  * placeholder dataset with isPlaceholder=true so the UI can show a clear
  * "simulated data" banner instead of presenting it as measured results.
+ *
+ * deployedArchitecture (from getMLModelStatus() in emotionDetector.ts)
+ * reflects which model's weights are ACTUALLY loaded from public/model/ —
+ * i.e. what's really running in the Real-Time Detector. This is the
+ * source of truth for "DEPLOYED" status and for which model's confusion
+ * matrix/per-class metrics are shown as primary, even if the other
+ * architecture happens to score a higher weighted F1. Pass null if not
+ * yet known (e.g. models haven't loaded), and this falls back to F1
+ * comparison for display purposes only — nothing here changes what's
+ * actually deployed, that's controlled entirely by what's in
+ * public/model/.
  */
-export async function loadBenchmarkResults(): Promise<BenchmarkResultBundle> {
+export async function loadBenchmarkResults(
+  deployedArchitecture: "custom_cnn" | "mobilenetv2" | null = null
+): Promise<BenchmarkResultBundle> {
   const [cnn, tl] = await Promise.all([
     fetchResultsFile("custom_cnn"),
     fetchResultsFile("mobilenetv2"),
@@ -165,30 +187,43 @@ export async function loadBenchmarkResults(): Promise<BenchmarkResultBundle> {
       confusionMatrixLabels: CONFUSION_MATRIX_LABELS,
       comparisonTable: PLACEHOLDER_COMPARISON_TABLE,
       winner: null,
+      hasCnnResults: false,
+      hasTlResults: false,
     };
   }
 
-  // Section 2.3 selection rule: weighted F1 is the tiebreaker
-  let winner: "custom_cnn" | "mobilenetv2" | null = null;
+  // Which architecture has the better weighted F1 (informational only)
+  let betterF1: "custom_cnn" | "mobilenetv2" | null = null;
   if (cnn && tl) {
     const cnnF1 = cnn.classification_report["weighted avg"]["f1-score"];
     const tlF1 = tl.classification_report["weighted avg"]["f1-score"];
-    winner = tlF1 >= cnnF1 ? "mobilenetv2" : "custom_cnn";
+    betterF1 = tlF1 >= cnnF1 ? "mobilenetv2" : "custom_cnn";
   } else if (cnn) {
-    winner = "custom_cnn";
+    betterF1 = "custom_cnn";
   } else if (tl) {
-    winner = "mobilenetv2";
+    betterF1 = "mobilenetv2";
   }
 
-  const winningResult = winner === "mobilenetv2" ? tl! : cnn!;
+  // Prefer the ACTUALLY DEPLOYED architecture as the primary result shown
+  // (confusion matrix / per-class metrics). Only fall back to the
+  // higher-F1 architecture if we don't know what's deployed, or its
+  // results file isn't present.
+  let primary: "custom_cnn" | "mobilenetv2" | null = null;
+  if (deployedArchitecture === "custom_cnn" && cnn) primary = "custom_cnn";
+  else if (deployedArchitecture === "mobilenetv2" && tl) primary = "mobilenetv2";
+  else primary = betterF1;
+
+  const primaryResult = primary === "mobilenetv2" ? tl! : cnn!;
 
   return {
     isPlaceholder: false,
     epochsData: buildEpochsData(cnn, tl),
-    classPerformance: toClassPerformance(winningResult.classification_report),
-    confusionMatrix: winningResult.confusion_matrix,
-    confusionMatrixLabels: winningResult.classes.map(capitalize),
-    comparisonTable: buildComparisonTable(cnn, tl, winner),
-    winner,
+    classPerformance: toClassPerformance(primaryResult.classification_report),
+    confusionMatrix: primaryResult.confusion_matrix,
+    confusionMatrixLabels: primaryResult.classes.map(capitalize),
+    comparisonTable: buildComparisonTable(cnn, tl, deployedArchitecture, betterF1),
+    winner: primary,
+    hasCnnResults: !!cnn,
+    hasTlResults: !!tl,
   };
 }
