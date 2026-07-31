@@ -121,7 +121,7 @@ export async function loadOnDeviceModels(): Promise<boolean> {
       );
       deployedArchitecture = hasMobileNetLayer ? "mobilenetv2" : "custom_cnn";
       console.log(`[ML Engine] Custom-trained model found and loaded from public/model/ (architecture: ${deployedArchitecture}).`);
-    } catch {
+    } catch (modelLoadErr) {
       customModel = null;
       usingCustomModel = false;
       deployedArchitecture = null;
@@ -130,6 +130,7 @@ export async function loadOnDeviceModels(): Promise<boolean> {
         "pretrained expression net. Run scripts/train_fer_pipeline.py and export to " +
         "public/model/ to switch to your own trained model."
       );
+      console.error("[ML Engine] Actual error while loading public/model/model.json:", modelLoadErr);
     }
 
     modelStatus = "ready";
