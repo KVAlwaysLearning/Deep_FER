@@ -227,6 +227,31 @@ export const generateSyntheticFeatureMap = generatePlaceholderFeatureMap;
  * layer / filter index doesn't exist — callers should fall back to
  * generatePlaceholderFeatureMap() in that case.
  */
+/**
+ * Finds every Conv2D layer in a model, including ones nested inside a
+ * sub-model. This matters specifically for the MobileNetV2 transfer model
+ * (Section 2.2): its backbone is a single "Functional" layer in the outer
+ * model's top-level layers list, with all of its real Conv2D layers living
+ * one level deeper inside it. A flat model.layers.filter(...) finds zero
+ * Conv2D layers for MobileNetV2 and silently falls back to placeholder
+ * data — this recursive walk is what makes real activations work for both
+ * the Custom CNN (flat) and MobileNetV2 (nested) architectures.
+ */
+function findAllConv2DLayers(model: tf.LayersModel): tf.layers.Layer[] {
+  const found: tf.layers.Layer[] = [];
+  const visit = (layer: tf.layers.Layer) => {
+    if (layer.getClassName() === "Conv2D") {
+      found.push(layer);
+    }
+    const nestedLayers = (layer as unknown as { layers?: tf.layers.Layer[] }).layers;
+    if (Array.isArray(nestedLayers)) {
+      nestedLayers.forEach(visit);
+    }
+  };
+  model.layers.forEach(visit);
+  return found;
+}
+
 export function computeRealFeatureMap(
   inputCanvas: HTMLCanvasElement,
   convLayerIndex: number,
@@ -235,7 +260,7 @@ export function computeRealFeatureMap(
   const model = getCustomModel();
   if (!model) return null;
 
-  const convLayers = model.layers.filter((l) => l.getClassName() === "Conv2D");
+  const convLayers = findAllConv2DLayers(model);
   const targetLayer = convLayers[convLayerIndex];
   if (!targetLayer) return null;
 
