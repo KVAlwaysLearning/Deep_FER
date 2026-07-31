@@ -111,15 +111,15 @@ export async function loadOnDeviceModels(): Promise<boolean> {
       customModel = await tf.loadLayersModel("/model/model.json");
       usingCustomModel = true;
       // scripts/train_fer_pipeline.py names the Keras model
-      // "Custom_4Block_CNN" or "MobileNetV2_FER2013" — that name survives
-      // TF.js conversion, so we can tell which architecture is actually
-      // deployed rather than guessing from input shape alone.
-      const modelName = customModel.name || "";
-      if (modelName.toLowerCase().includes("mobilenet")) {
-        deployedArchitecture = "mobilenetv2";
-      } else {
-        deployedArchitecture = "custom_cnn";
-      }
+      // "Custom_4Block_CNN" or "MobileNetV2_FER2013", but the top-level
+      // model.name isn't reliably preserved through TF.js conversion.
+      // A much more robust signal: MobileNetV2 always contains a nested
+      // sub-model layer literally named "mobilenetv2_..." (visible in the
+      // Python model.summary() output) — Custom CNN never has this.
+      const hasMobileNetLayer = customModel.layers.some((l) =>
+        l.name.toLowerCase().includes("mobilenet")
+      );
+      deployedArchitecture = hasMobileNetLayer ? "mobilenetv2" : "custom_cnn";
       console.log(`[ML Engine] Custom-trained model found and loaded from public/model/ (architecture: ${deployedArchitecture}).`);
     } catch {
       customModel = null;
