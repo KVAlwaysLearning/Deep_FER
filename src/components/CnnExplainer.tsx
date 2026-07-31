@@ -9,8 +9,6 @@ import {
   Sliders,
   Video,
   VideoOff,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import {
   CNN_LAYERS_SPEC,
@@ -199,32 +197,6 @@ export const CnnExplainer: React.FC = () => {
             {liveMode ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
             {liveMode ? "Stop Live Mode" : "Live Mode (Webcam)"}
           </button>
-
-          <div
-            className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
-              usingRealActivations
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                : "bg-amber-500/10 border-amber-500/20 text-amber-300"
-            }`}
-            title={
-              usingRealActivations
-                ? modelInfo.modelSource
-                : modelInfo.usingCustomModel
-                ? "A trained model IS loaded, but real activations for this specific layer couldn't be extracted (common for layers nested inside MobileNetV2's backbone) — showing illustrative data for this layer instead."
-                : "No trained model found at public/model/ yet — run scripts/train_fer_pipeline.py and export there to see real activations."
-            }
-          >
-            {usingRealActivations ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : (
-              <AlertTriangle className="w-3.5 h-3.5" />
-            )}
-            {usingRealActivations
-              ? "Real Activations"
-              : modelInfo.usingCustomModel
-              ? `Simulated (${modelInfo.deployedArchitecture ?? "model"} loaded, this layer unavailable)`
-              : "Simulated (model not trained yet)"}
-          </div>
         </div>
       </div>
 
