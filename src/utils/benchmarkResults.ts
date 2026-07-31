@@ -116,7 +116,7 @@ function buildComparisonTable(
 ) {
   const statusFor = (arch: "custom_cnn" | "mobilenetv2"): string => {
     if (deployed === arch) return "DEPLOYED (Wired to Real-Time Pipeline)";
-    if (betterF1 === arch) return "Higher Weighted F1 (Not Deployed)";
+    if (betterF1 === arch) return "Higher Weighted F1";
     return "Baseline Contender";
   };
 
