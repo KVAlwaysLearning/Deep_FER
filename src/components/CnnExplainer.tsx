@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Calculator,
   ArrowRight,
-  Info,
   Sliders,
   Video,
   VideoOff,
@@ -238,32 +237,6 @@ export const CnnExplainer: React.FC = () => {
           </h3>
           <span className="text-xs text-slate-400">Total Params: 1,482,951</span>
         </div>
-
-        {!modelInfo.usingCustomModel && (
-          <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2">
-            <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span>
-              This diagram shows the planned Custom CNN architecture (Section 2.1) for reference. No
-              trained model has been loaded from <code className="text-amber-200">public/model/</code>{" "}
-              yet, so feature maps below are simulated. Run{" "}
-              <code className="text-amber-200">scripts/train_fer_pipeline.py</code> and export the
-              result there to see this tab switch to real activations automatically.
-            </span>
-          </div>
-        )}
-
-        {modelInfo.usingCustomModel && !usingRealActivations && (
-          <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2">
-            <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span>
-              Your trained {modelInfo.deployedArchitecture ?? "model"} IS loaded and IS what's running
-              live predictions — but real activations for this particular layer couldn't be extracted
-              (this can happen with layers nested inside MobileNetV2's backbone). Feature maps below
-              are illustrative for this layer only; try a different layer above, or predictions
-              elsewhere in the app are unaffected.
-            </span>
-          </div>
-        )}
 
         <div className="flex items-center gap-2 overflow-x-auto pb-3 pt-1 scrollbar-none">
           {CNN_LAYERS_SPEC.map((layer, idx) => {
