@@ -210,6 +210,8 @@ export const CnnExplainer: React.FC = () => {
             title={
               usingRealActivations
                 ? modelInfo.modelSource
+                : modelInfo.usingCustomModel
+                ? "A trained model IS loaded, but real activations for this specific layer couldn't be extracted (common for layers nested inside MobileNetV2's backbone) — showing illustrative data for this layer instead."
                 : "No trained model found at public/model/ yet — run scripts/train_fer_pipeline.py and export there to see real activations."
             }
           >
@@ -218,7 +220,11 @@ export const CnnExplainer: React.FC = () => {
             ) : (
               <AlertTriangle className="w-3.5 h-3.5" />
             )}
-            {usingRealActivations ? "Real Activations" : "Simulated (model not trained yet)"}
+            {usingRealActivations
+              ? "Real Activations"
+              : modelInfo.usingCustomModel
+              ? `Simulated (${modelInfo.deployedArchitecture ?? "model"} loaded, this layer unavailable)`
+              : "Simulated (model not trained yet)"}
           </div>
         </div>
       </div>
@@ -242,6 +248,19 @@ export const CnnExplainer: React.FC = () => {
               yet, so feature maps below are simulated. Run{" "}
               <code className="text-amber-200">scripts/train_fer_pipeline.py</code> and export the
               result there to see this tab switch to real activations automatically.
+            </span>
+          </div>
+        )}
+
+        {modelInfo.usingCustomModel && !usingRealActivations && (
+          <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2">
+            <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            <span>
+              Your trained {modelInfo.deployedArchitecture ?? "model"} IS loaded and IS what's running
+              live predictions — but real activations for this particular layer couldn't be extracted
+              (this can happen with layers nested inside MobileNetV2's backbone). Feature maps below
+              are illustrative for this layer only; try a different layer above, or predictions
+              elsewhere in the app are unaffected.
             </span>
           </div>
         )}
